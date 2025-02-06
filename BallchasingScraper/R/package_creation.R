@@ -1,0 +1,250 @@
+get_replays_by_criteria <- function(start_date, end_date = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ"), match_type = NULL, whouploader = NULL, player_ids, api_key, callspersecond = 2) {
+
+  url <- "https://ballchasing.com/api/replays"
+
+  # Initialize an empty list to store replay IDs
+  all_replay_ids <- list()
+
+  # Loop through each player ID
+  for (player_id in player_ids) {
+    count <- 1  # Reset count for each player
+    message("Processing replays for player ", player_id)
+    query = list(
+      `replay-date-after` = start_date,
+      `replay-date-before` = end_date
+    )
+
+    if (!is.null(match_type)) query$playlist <- match_type
+    if (!is.null(whouploader)) query$uploader <- whouploader
+    if (!is.null(player_id)) query$`player-id` <- player_id
+    query$count <- as.integer(200)
+    response <- GET(
+      url,
+      add_headers(Authorization = api_key),
+      query = query
+    )
+    if (status_code(response) == 200) {
+      replays <- content(response, as = "parsed", type = "application/json")
+      if (length(replays$list) > 0) {
+        replay_ids <- sapply(replays$list, function(x) x$id)
+        # Append unique replay IDs to the list, avoiding duplicates
+        all_replay_ids <- unique(c(all_replay_ids, replay_ids))  # Ensure uniqueness here
+        while(((length(all_replay_ids)) %% 200) == 0) {
+          message("More than 200 replays found, repeating process.")
+          last_replay_id <- all_replay_ids[length(all_replay_ids)]
+          message(last_replay_id)
+          url2 <- paste0("https://ballchasing.com/api/replays/", last_replay_id)
+          response <- GET(url2, add_headers(Authorization = api_key))
+          if (status_code(response) == 200) {
+
+            content_text <- httr::content(response, as = "text")
+            last_replay_data <- fromJSON(content_text, flatten = TRUE)
+
+          }  else {
+            stop("Failed to retrieve data: ", status_code(response))
+          }
+          Sys.sleep(1/callspersecond)
+          new_end_date <- last_replay_data[["date"]]
+          time_zone <- str_sub(new_end_date, -6)
+          new_end_date2 <- str_sub(new_end_date, end = -7)
+          end_posix <- as_datetime(new_end_date2, format = "%Y-%m-%dT%H:%M:%S")
+          end_posix <- end_posix - 1
+          FinalEndDate <- paste0(as.character(end_posix), time_zone)
+          FinalEndDate <- str_replace(FinalEndDate, " ", "T")
+          message("Start of new call replay date: ", FinalEndDate)
+          query = list(
+            `replay-date-after` = start_date,
+            `replay-date-before` = FinalEndDate
+          )
+
+          if (!is.null(match_type)) query$playlist <- match_type
+          if (!is.null(whouploader)) query$uploader <- whouploader
+          if (!is.null(player_id)) query$`player-id` <- player_id
+          query$count <- 200
+          response2 <- GET(
+            url,
+            add_headers(Authorization = api_key),
+            query = query
+          )
+          if (status_code(response) == 200) {
+            replays2 <- content(response2, as = "parsed", type = "application/json")
+
+            if (length(replays2$list) > 0) {
+              replay_ids_new <- sapply(replays2$list, function(x) x$id)
+              # Append unique replay IDs to the list, avoiding duplicates
+              all_replay_ids <- unique(c(all_replay_ids, replay_ids_new))  # Ensure uniqueness here
+            }
+          }
+        }
+      }
+
+      Sys.sleep(1/callspersecond)  # Rate limit handling
+    }
+    else if (status_code(response) == 429) {
+      stop("Rate limit hit. You've either hit Ballchasing's hourly limit or put in the wrong patron tier into the callspersecond variable.")}
+      else {
+      stop("Failed to retrieve replays for player ", player_id, ", status code: ", status_code(response))
+
+    }
+
+    # Return unique replay IDs
+    ReplayCount = 0
+
+  }
+  message("Returned ", length(all_replay_ids), " replay IDs.")
+  return(all_replay_ids)  # Return unique replay IDs directly
+}
+
+get_replay_data <- function(api_key = apikey, replay_id, callspersecond = 2) {
+  url <- paste0("https://ballchasing.com/api/replays/", replay_id)
+  response <- GET(url, add_headers(Authorization = api_key))
+  if (status_code(response) == 200) {
+    Sys.sleep(1/callspersecond)
+    content_text <- httr::content(response, as = "text")
+    replay_data <- fromJSON(content_text, flatten = TRUE)
+
+  }
+  else if (status_code(response) == 429) {
+    stop("Rate limit hit. You've either hit Ballchasing's hourly limit or put in the wrong patron tier into the callspersecond variable.")}
+    else {
+    stop("Failed to retrieve data: ", status_code(response))
+  }
+  if (!is.null(replay_data[["blue"]])){
+    blue_df <- replay_data[["blue"]][["players"]]
+    blue_core_stats_cols <- grep("stats.core.", names(blue_df), value = TRUE)
+    blue_name_stats_cols <- subset(blue_df, select = c(name, id.id, stats.demo.inflicted, stats.demo.taken))
+    blue_df_sub <- cbind(blue_name_stats_cols, blue_df[, blue_core_stats_cols])
+    blue_df_sub$team <- "blue"
+    blue_df_sub$win <- (sum(blue_df_sub[,"stats.core.mvp"]))
+  }
+
+  if (!is.null(replay_data[["orange"]])) {
+    orange_df <- replay_data[["orange"]][["players"]]
+    orange_core_stats_cols <- grep("stats.core.", names(orange_df), value = TRUE)
+    orange_name_stats_cols <- subset(orange_df, select = c(name, id.id, stats.demo.inflicted, stats.demo.taken))
+    orange_df_sub <- cbind(orange_name_stats_cols, orange_df[, orange_core_stats_cols])
+    orange_df_sub$team <- "orange"
+    orange_df_sub$win <- (sum(orange_df_sub[,"stats.core.mvp"]))
+  }
+
+  AllTogether <- rbind(blue_df_sub, orange_df_sub)
+  AllTogether$match_guid <- replay_data[["match_guid"]]
+  AllTogether$match_date <- as_datetime(replay_data[["date"]])
+  AllTogether$BallchasingLink <- paste("https://ballchasing.com/replay/", replay_id, sep = "")
+
+  return(AllTogether)
+}
+
+RankedStats <- function(results,  TopPlayerOnly = TRUE, RemoveNextUp = FALSE, rank = "Champion") {
+
+  # Step 1: Count games for each player and summarize results
+  Names <- Find_Player_Names(results)
+  results <- results %>%
+    count(id.id, name = "NumGames") %>%
+    left_join(results, by = "id.id") %>%
+    group_by(id.id) %>%
+    summarise(
+      across(where(is.numeric), mean, na.rm = TRUE),
+      NumGames = first(NumGames)
+    ) %>%
+    mutate(NumGames = sqrt(NumGames)) %>%
+    arrange(desc(NumGames))
+
+  # Step 2: Normalize stats columns
+  results <- results %>%
+    mutate(
+      NumGames = NumGames^2
+
+    )
+  results2 <- merge(Names, results, by = "id.id")
+  results2 <- arrange(results2, desc(NumGames))
+  results2 <- results2 %>%
+    rename(
+      PlayerID = id.id,
+      PlayerName = most_common_name,
+      `#Games` = NumGames,
+      `Demos/G` = stats.demo.inflicted,
+      `DemosTaken/G` = stats.demo.taken,
+      `Shots/G` = stats.core.shots,
+      `ShotsA/G` = stats.core.shots_against,
+      `Goals/G` = stats.core.goals,
+      `GoalsA/G` = stats.core.goals_against,
+      `Saves/G` = stats.core.saves,
+      `Assists/G` = stats.core.assists,
+      `Score/G` = stats.core.score,
+      `Shooting%` = stats.core.shooting_percentage,
+      `Win%` = win
+    )
+
+  message("RankedStats Process Complete!")
+  if(TopPlayerOnly == TRUE){
+    ifelse(RemoveNextUp == TRUE, results_notop <- results2[3:nrow(results2),], results_notop <- results2[2:nrow(results2),])
+
+
+    #Divide all numeric columns by NumGames, then do sum
+    someDF <- results_notop %>%
+      mutate(across(where(is.numeric), ~ . / `#Games`, .names = "{.col}")) %>%
+      summarise(across(where(is.numeric), mean, na.rm = TRUE))
+    PlayerStats <- head(results2, n = 1)
+
+    someDF[["Win%"]] = NA
+    someDF[["#Games"]] = NA
+    TotalAverages_2s <- data.frame(matrix(nrow = 8, ncol = 14))
+    rownames(TotalAverages_2s) = c("Bronze", "Silver", "Gold", "Platinum", "Diamond", "Champion", "GC", "Pros")
+    colnames(TotalAverages_2s) = colnames(results2)
+    TotalAverages_2s$`Demos/G` <- c(0.41, 0.42, 0.46, 0.50, 0.57, 0.64, 0.73, 0.81)
+    TotalAverages_2s$`DemosTaken/G` <- c(0.41, 0.44, 0.49, 0.51, 0.56, 0.63, 0.71, 0.78)
+    TotalAverages_2s$`Shots/G` <- c(2.11, 2.48, 2.77, 3.01, 3.22, 3.52, 3.85, 4.31)
+    TotalAverages_2s$`ShotsA/G` <- TotalAverages_2s$`Shots/G` * 2
+    TotalAverages_2s$`Goals/G` <- c(1.38, 1.48, 1.42, 1.26, 1.13, 1.06, 0.97, 1.33)
+    TotalAverages_2s$`GoalsA/G` <- TotalAverages_2s$`Goals/G`*2
+    TotalAverages_2s$`Saves/G` <- c(0.58, 0.77, 0.94, 1.11, 1.29, 1.52, 1.77, 2.01)
+    TotalAverages_2s$`Assists/G`<- c(0.44, 0.5, 0.55, 0.59, 0.64, 0.69, 0.73, 0.78)
+    TotalAverages_2s$`Score/G` <- c(314.87, 368.08, 403.65, 428.39, 450.14, 477.54, 507.23, 549.84)
+    TotalAverages_2s$`Shooting%` <- (TotalAverages_2s$`Goals/G` / TotalAverages_2s$`Shots/G`)*100
+
+    RankedAverageRow <- as.data.frame(TotalAverages_2s[rank, , drop = FALSE])
+    # Combine the data frames
+    Final <- bind_rows(
+      PlayerStats,
+      someDF,
+      RankedAverageRow
+    )
+    Final <- as.data.frame(Final)
+
+
+    rownames(Final) <- c("Player Stats", "Lobby Averages", paste0(rank, " Rank Average (2s)"))
+
+    return(Final)
+
+  }
+  if (TopPlayerOnly == FALSE){
+    return(results2)
+  }
+}
+
+Find_Player_Names <- function(results) {
+  replace(results$name, is.na(results$name), "(blank name)")
+  results <- results %>%
+    group_by(id.id) %>%
+    reframe(
+      most_common_name = paste0(names(which.max(table(name)))), # Find the most frequent name for each ID
+    ) %>%
+    ungroup()
+  return(results)
+}
+
+RunReplays <- function(replay_id_data, api_key, callspersecond = 2){
+  results <- get_replay_data(api_key, replay_id_data[[1]])
+  TotalReplayCount = length(replay_id_data)
+  ReplayCount = 1
+  #Fix the dates in the >200 replays part
+  while (ReplayCount < TotalReplayCount) {
+    message("Processing replay ", ReplayCount, " out of ", TotalReplayCount)
+    ReplayCount <- ReplayCount + 1
+    replay_results <- get_replay_data(api_key, replay_id_data[[ReplayCount]], callspersecond)
+    results <- rbind(results, replay_results)
+
+  }
+  return(results)
+}
