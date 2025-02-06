@@ -3,7 +3,7 @@ This project was a way for me to learn R by doing something I actually enjoy, so
 
 
 ### Usage
-This package can be downloaded to the user's rstudio by installing the `devtools` package and running the command `devtools::install_github('brettjacot/BallchasingScrapePackage')`. The general workflow of this package is as follows:
+This package can be downloaded to the user's rstudio by installing the `devtools` package and running the command `devtools::install_github('brettjacot/BallchasingScrapeR')`. The general workflow of this package is as follows:
 1. get_replays_by_criteria() function to acquire a list of replay IDs based on the user-input criteria 
 2. RunReplays() function with the results of get_replays_by_criteria()
 3. RankedStats() function with the results of RunReplays()
