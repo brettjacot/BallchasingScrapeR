@@ -1,14 +1,11 @@
-get_replays_by_criteria <- function(start_date, end_date = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ"), match_type = NULL, whouploader = NULL, player_ids, api_key, callspersecond = 2) {
+get_replays_by_criteria <- function(start_date, end_date = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ"), match_type = NULL, whouploader = NULL, player_id = NULL, api_key, callspersecond = 2) {
 
   url <- "https://ballchasing.com/api/replays"
-
+counter = 1
   # Initialize an empty list to store replay IDs
   all_replay_ids <- list()
 
-  # Loop through each player ID
-  for (player_id in player_ids) {
-    count <- 1  # Reset count for each player
-    message("Processing replays for player ", player_id)
+    message("Processing request....")
     query = list(
       `replay-date-after` = start_date,
       `replay-date-before` = end_date
@@ -28,11 +25,11 @@ get_replays_by_criteria <- function(start_date, end_date = format(Sys.time(), "%
       if (length(replays$list) > 0) {
         replay_ids <- sapply(replays$list, function(x) x$id)
         # Append unique replay IDs to the list, avoiding duplicates
-        all_replay_ids <- unique(c(all_replay_ids, replay_ids))  # Ensure uniqueness here
+        all_replay_ids <- (c(all_replay_ids, replay_ids))  # Ensure uniqueness here
         while(((length(all_replay_ids)) %% 200) == 0) {
-          message("More than 200 replays found, repeating process.")
+          message("More than ", (200 * counter)," replays found, repeating process.")
+          counter = counter + 1
           last_replay_id <- all_replay_ids[length(all_replay_ids)]
-          message(last_replay_id)
           url2 <- paste0("https://ballchasing.com/api/replays/", last_replay_id)
           response <- GET(url2, add_headers(Authorization = api_key))
           if (status_code(response) == 200) {
@@ -45,22 +42,37 @@ get_replays_by_criteria <- function(start_date, end_date = format(Sys.time(), "%
           }
           Sys.sleep(1/callspersecond)
           new_end_date <- last_replay_data[["date"]]
-          time_zone <- str_sub(new_end_date, -6)
-          new_end_date2 <- str_sub(new_end_date, end = -7)
-          end_posix <- as_datetime(new_end_date2, format = "%Y-%m-%dT%H:%M:%S")
+          has_timezone <- last_replay_data[["date_has_timezone"]]
+
+          if (has_timezone) {
+            # Format: "2025-01-07T22:14:23+01:00"
+            time_zone <- str_sub(new_end_date, -6)
+            new_end_date2 <- str_sub(new_end_date, end = -7)
+            end_posix <- as_datetime(new_end_date2, format = "%Y-%m-%dT%H:%M:%S")
+          } else {
+            # Format: "2024-11-17T19:27:33Z"
+            time_zone <- "Z"
+            new_end_date2 <- str_sub(new_end_date, end = -2)  # Remove "Z"
+            end_posix <- as_datetime(new_end_date2, format = "%Y-%m-%dT%H:%M:%S", tz = "UTC")
+          }
+
+          # Subtract 1 second
           end_posix <- end_posix - 1
+
+          # Format final date
           FinalEndDate <- paste0(as.character(end_posix), time_zone)
           FinalEndDate <- str_replace(FinalEndDate, " ", "T")
+
           message("Start of new call replay date: ", FinalEndDate)
-          query = list(
-            `replay-date-after` = start_date,
-            `replay-date-before` = FinalEndDate
-          )
+          query = list()
+
+            query$`replay-date-after` = start_date
+            query$`replay-date-before` = FinalEndDate
 
           if (!is.null(match_type)) query$playlist <- match_type
           if (!is.null(whouploader)) query$uploader <- whouploader
           if (!is.null(player_id)) query$`player-id` <- player_id
-          query$count <- 200
+          query$count <- as.integer(200)
           response2 <- GET(
             url,
             add_headers(Authorization = api_key),
@@ -72,27 +84,23 @@ get_replays_by_criteria <- function(start_date, end_date = format(Sys.time(), "%
             if (length(replays2$list) > 0) {
               replay_ids_new <- sapply(replays2$list, function(x) x$id)
               # Append unique replay IDs to the list, avoiding duplicates
-              all_replay_ids <- unique(c(all_replay_ids, replay_ids_new))  # Ensure uniqueness here
+              all_replay_ids <- (c(all_replay_ids, replay_ids_new))  # Ensure uniqueness here
             }
           }
         }
       }
-
-      Sys.sleep(1/callspersecond)  # Rate limit handling
     }
     else if (status_code(response) == 429) {
       stop("Rate limit hit. You've either hit Ballchasing's hourly limit or put in the wrong patron tier into the callspersecond variable.")}
       else {
-      stop("Failed to retrieve replays for player ", player_id, ", status code: ", status_code(response))
+      stop("Failed to retrieve replays, status code: ", status_code(response))
 
     }
 
-    # Return unique replay IDs
-    ReplayCount = 0
 
-  }
+
   message("Returned ", length(all_replay_ids), " replay IDs.")
-  return(all_replay_ids)  # Return unique replay IDs directly
+  return(unique(all_replay_ids))  # Return unique replay IDs directly
 }
 
 get_replay_data <- function(api_key = apikey, replay_id, callspersecond = 2) {
@@ -247,4 +255,33 @@ RunReplays <- function(replay_id_data, api_key, callspersecond = 2){
 
   }
   return(results)
+}
+# Function to get replay stats by ID
+
+stats_from_group <- function(group_id, api_key) {
+  url <- paste0("https://ballchasing.com/api/groups/", group_id)
+
+  # API request with query parameters
+  response <- GET(
+    url,
+    add_headers(Authorization = api_key),
+    query = list(count = 200)  # Request up to 200 replays
+  )
+
+  # Check for request success
+  if (http_type(response) != "application/json") {
+    stop("API request failed. Check the group ID and API key.")
+  }
+
+  # Parse JSON response
+  content_data <- content(response, as = "text", encoding = "UTF-8")
+  parsed_data <- fromJSON(content_data, flatten = TRUE)
+  message("Group data collected!")
+  datadf <- parsed_data[["players"]]
+  core_stats_cols <- grep("game_average.core.", names(datadf), value = TRUE)
+  name_stats <- subset(datadf, select = c(id, cumulative.games, cumulative.wins, cumulative.win_percentage, game_average.demo.taken, game_average.demo.inflicted))
+  core_stats <- datadf[c(core_stats_cols)]
+  overall_stats <- cbind(name_stats, core_stats)
+  overall_stats$game_average.core.mvp = NULL
+  return(overall_stats)
 }

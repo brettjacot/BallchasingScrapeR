@@ -1,7 +1,7 @@
 Package: BallchasingScraper
 Type: Package
 Title: Pull and Analyze Replays from Ballchasing.com
-Version: 0.1.0
+Version: 0.2.0
 Author: Brett Jacot
 Maintainer: Brett Jacot <brett.jacot@gmail.com>
 Depends: R(>= 4.1.1)
