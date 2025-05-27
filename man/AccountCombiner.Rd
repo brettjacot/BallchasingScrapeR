@@ -1,6 +1,5 @@
 \name{AccountCombiner}
 \alias{AccountCombiner}
-%- Also NEED an '\alias' for EACH other topic documented here.
 \title{
 Combine Accounts within a Dataset
 }
@@ -10,7 +9,6 @@ Combine the stats from accounts if a player is playing on an alternate account i
 \usage{
 AccountCombiner(data, main, alt1, alt2 = NULL, alt3 = NULL)
 }
-%- maybe also 'usage' for other objects documented here.
 \arguments{
   \item{data}{
 Dataset from the stats_from_group() function.

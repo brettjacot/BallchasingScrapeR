@@ -1,6 +1,5 @@
 \name{stats_from_group}
 \alias{stats_from_group}
-%- Also NEED an '\alias' for EACH other topic documented here.
 \title{
 Stats from Ballchasing Group
 }
@@ -10,7 +9,6 @@ Takes replays from a group and returns a dataframe with stats.
 \usage{
 stats_from_group(group_id, api_key, name = FALSE)
 }
-%- maybe also 'usage' for other objects documented here.
 \arguments{
   \item{group_id}{
 A Ballchasing Group ID. Example: "ontario-campus-carball-winter-20-xxukviq8ww"
@@ -94,12 +92,4 @@ function(group_id, api_key, name = FALSE) {
 
 Result <- stats_from_group(group_id = "ontario-campus-carball-winter-20-xxukviq8ww", api_key = "P9LtEgF40vIUHUcrPrD4p9KSlYPvXPEoolUQHnqZ")
 }
-% Add one or more standard keywords, see file 'KEYWORDS' in the
-% R documentation directory (show via RShowDoc("KEYWORDS")):
-% \keyword{ ~kwd1 }
-% \keyword{ ~kwd2 }
-% Use only one keyword per line.
-% For non-standard keywords, use \concept instead of \keyword:
-% \concept{ ~cpt1 }
-% \concept{ ~cpt2 }
-% Use only one concept per line.
+

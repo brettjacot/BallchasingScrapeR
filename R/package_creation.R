@@ -6,7 +6,7 @@ counter = 1
   all_replay_ids <- list()
 
     message("Processing request....")
-    query = list(
+    query = list( #making the query based on user-input criteria
       `replay-date-after` = start_date,
       `replay-date-before` = end_date
     )
@@ -15,7 +15,7 @@ counter = 1
     if (!is.null(whouploader)) query$uploader <- whouploader
     if (!is.null(player_id)) query$`player-id` <- player_id
     query$count <- as.integer(200)
-    response <- GET(
+    response <- GET( #querying ballchasing for 200 replay ids
       url,
       add_headers(Authorization = api_key),
       query = query
@@ -23,14 +23,13 @@ counter = 1
     if (status_code(response) == 200) {
       replays <- content(response, as = "parsed", type = "application/json")
       if (length(replays$list) > 0) {
-        replay_ids <- sapply(replays$list, function(x) x$id)
-        # Append unique replay IDs to the list, avoiding duplicates
-        all_replay_ids <- (c(all_replay_ids, replay_ids))  # Ensure uniqueness here
-        while(((length(all_replay_ids)) %% 200) == 0) {
+        replay_ids <- sapply(replays$list, function(x) x$id) #adding these IDs to a final list
+        all_replay_ids <- (c(all_replay_ids, replay_ids))
+        while(((length(all_replay_ids)) %% 200) == 0) { #if more than 200 replays, repeat process until you get to the end
           message("More than ", (200 * counter)," replays found, repeating process.")
           counter = counter + 1
           last_replay_id <- all_replay_ids[length(all_replay_ids)]
-          url2 <- paste0("https://ballchasing.com/api/replays/", last_replay_id)
+          url2 <- paste0("https://ballchasing.com/api/replays/", last_replay_id) #finding the date from last replay and using that for the next call
           response <- GET(url2, add_headers(Authorization = api_key))
           if (status_code(response) == 200) {
 
@@ -40,11 +39,11 @@ counter = 1
           }  else {
             stop("Failed to retrieve data: ", status_code(response))
           }
-          Sys.sleep(1/callspersecond)
+          Sys.sleep(1/callspersecond) #rate limiting
           new_end_date <- last_replay_data[["date"]]
           has_timezone <- last_replay_data[["date_has_timezone"]]
 
-          if (has_timezone) {
+          if (has_timezone) { #Dates can be in two different formats, this is how I account for that
             # Format: "2025-01-07T22:14:23+01:00"
             time_zone <- str_sub(new_end_date, -6)
             new_end_date2 <- str_sub(new_end_date, end = -7)
@@ -56,7 +55,7 @@ counter = 1
             end_posix <- as_datetime(new_end_date2, format = "%Y-%m-%dT%H:%M:%S", tz = "UTC")
           }
 
-          # Subtract 1 second
+          # Subtract 1 second so the replay isn't re-run
           end_posix <- end_posix - 1
 
           # Format final date
@@ -64,7 +63,7 @@ counter = 1
           FinalEndDate <- str_replace(FinalEndDate, " ", "T")
 
           message("Start of new call replay date: ", FinalEndDate)
-          query = list()
+          query = list() #making new call
 
             query$`replay-date-after` = start_date
             query$`replay-date-before` = FinalEndDate
@@ -80,11 +79,9 @@ counter = 1
           )
           if (status_code(response) == 200) {
             replays2 <- content(response2, as = "parsed", type = "application/json")
-
             if (length(replays2$list) > 0) {
               replay_ids_new <- sapply(replays2$list, function(x) x$id)
-              # Append unique replay IDs to the list, avoiding duplicates
-              all_replay_ids <- (c(all_replay_ids, replay_ids_new))  # Ensure uniqueness here
+              all_replay_ids <- (c(all_replay_ids, replay_ids_new))
             }
           }
         }
@@ -104,7 +101,7 @@ counter = 1
 }
 
 get_replay_data <- function(api_key = apikey, replay_id, callspersecond = 2, alldata = FALSE) {
-  url <- paste0("https://ballchasing.com/api/replays/", replay_id)
+  url <- paste0("https://ballchasing.com/api/replays/", replay_id) #add replay id to be processed to the link
   response <- GET(url, add_headers(Authorization = api_key))
   if (status_code(response) == 200) {
     Sys.sleep(1/callspersecond)
@@ -117,7 +114,7 @@ get_replay_data <- function(api_key = apikey, replay_id, callspersecond = 2, all
     else {
     stop("Failed to retrieve data: ", status_code(response))
   }
-  if (alldata == FALSE) {
+  if (alldata == FALSE) { #just main stats for each player
   if (!is.null(replay_data[["blue"]])){
     blue_df <- replay_data[["blue"]][["players"]]
     blue_core_stats_cols <- grep("stats.core.", names(blue_df), value = TRUE)
@@ -144,14 +141,14 @@ get_replay_data <- function(api_key = apikey, replay_id, callspersecond = 2, all
   return(AllTogether)
   }
 
-  if (alldata == TRUE) {
+  if (alldata == TRUE) { #if every stat is requested
     if (!is.null(replay_data[["blue"]])){
       blue_df2 <- as.data.frame(replay_data[["blue"]][["players"]])
       if (("stats.positioning.goals_against_while_last_defender" %in% colnames(blue_df2)) == FALSE) {
-        blue_df2$stats.positioning.goals_against_while_last_defender = 0
+        blue_df2$stats.positioning.goals_against_while_last_defender = 0 #sometimes this is NA if shutout
       }
       if (("mvp" %in% colnames(blue_df2)) == FALSE) {
-        blue_df2$mvp = FALSE
+        blue_df2$mvp = FALSE #NA if loss sometimes
       }
     }
     if (!is.null(replay_data[["orange"]])) {
@@ -229,7 +226,7 @@ RankedStats <- function(results,  TopPlayerOnly = TRUE, RemoveNextUp = FALSE, ra
     someDF[["Win%"]] = NA
     someDF[["#Games"]] = NA
     TotalAverages_2s <- data.frame(matrix(nrow = 8, ncol = 14))
-    rownames(TotalAverages_2s) = c("Bronze", "Silver", "Gold", "Platinum", "Diamond", "Champion", "GC", "Pros")
+    rownames(TotalAverages_2s) = c("Bronze", "Silver", "Gold", "Platinum", "Diamond", "Champion", "GC", "Pros") #these stats are from ballchasing
     colnames(TotalAverages_2s) = colnames(results2)
     TotalAverages_2s$`Demos/G` <- c(0.41, 0.42, 0.46, 0.50, 0.57, 0.64, 0.73, 0.81)
     TotalAverages_2s$`DemosTaken/G` <- c(0.41, 0.44, 0.49, 0.51, 0.56, 0.63, 0.71, 0.78)
@@ -329,10 +326,8 @@ AccountCombiner <- function(data, main, alt1, alt2 = NULL, alt3 = NULL) {
 
   # Get the rows to combine (main + all alts)
   fixDF <- data[data$id %in% c(main, alts), ]
-print(str(fixDF))
   # Remove combined accounts from the dataset
   data2 <- data[!data$id %in% c(main, alts), ]
-print(str(data2))
   # Summarise with weighted and summed stats
   combined <- fixDF %>%
     summarise(
@@ -341,16 +336,11 @@ print(str(data2))
              ~ weighted.mean(.x, fixDF$cumulative.games, na.rm = TRUE)),
       across(c("cumulative.games", "cumulative.wins"), sum, na.rm = TRUE)
     )
-print(str(combined))
   # Recalculate shooting percentage
   combined$game_average.core.shooting_percentage <-
     (combined$game_average.core.goals / combined$game_average.core.shots) * 100
 
   # Reattach the new combined account to the rest of the data
   final <- rbind(data2, combined)
-print(str(final))
   return(final)
-
-
-  #this works for combining one account but i do want to add multi acc functionality
 }

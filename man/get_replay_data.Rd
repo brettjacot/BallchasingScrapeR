@@ -8,7 +8,7 @@ Get Replay Data
 Processes a singular replay and returns the main stats for all players.
 }
 \usage{
-get_replay_data(api_key, replay_id, callspersecond = 2)
+get_replay_data(api_key, replay_id, callspersecond = 2, AllData = FALSE)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -27,6 +27,9 @@ get_replay_data(api_key, replay_id, callspersecond = 2)
 \cr
   Note that free users only get 500 calls per hour, which this program may hit with a large list of replays if users are not careful.
   }
+  \item{alldata}{
+  Whether all stats produced from Ballchasing should be saved to the list (default = FALSE)
+}
 }
 \details{
 %%  ~~ If necessary, more details than the description above ~~
@@ -52,7 +55,6 @@ Match GUID \cr
 Match Date/Time \cr
 Ballchasing Link
 
-
 }
 \references{
 Ballchasing API Documentation- https://ballchasing.com/doc/api \cr
@@ -65,20 +67,6 @@ Brett Jacot
 Note that I've changed a few digits from my own API key in the example code, as API keys are private and user-specific.
 }
 
-%% ~Make other sections like Warning with \section{Warning }{....} ~
-
-\seealso{
-%% ~~objects to See Also as \code{\link{help}}, ~~~
-}
 \examples{
 get_replay_data(api_key = "P9LtEgF40vIUHUcrPrD4p9KSlYPvXPEoolUQHnqZ", replay_id = "8a39eb7a-2334-4b3b-b083-b5c18ad98140", callspersecond = 2)
 }
-% Add one or more standard keywords, see file 'KEYWORDS' in the
-% R documentation directory (show via RShowDoc("KEYWORDS")):
-% \keyword{ ~kwd1 }
-% \keyword{ ~kwd2 }
-% Use only one keyword per line.
-% For non-standard keywords, use \concept instead of \keyword:
-% \concept{ ~cpt1 }
-% \concept{ ~cpt2 }
-% Use only one concept per line.

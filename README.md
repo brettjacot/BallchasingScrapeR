@@ -1,7 +1,7 @@
 ### Ballchasing Scraper (R)
-This project was a way for me to learn R by doing something I actually enjoy, so I created a basic package that allows for replays and groups on Ballchasing.com to be parsed for stats more easily(bear with me as this is the first time I've uploaded any sort of code to github, this may not be perfect).
+This project was a way for me to learn R by doing something I actually enjoy, so I created a basic package that allows for replays and groups on Ballchasing.com to be parsed for stats more easily (bear with me as this is the first time I've uploaded any sort of code to github, this may not be perfect).
 
-This idea started from me coding the barebones of this package as a single program for Ontario Campus Carball's stats in Fall 2024, and by Winter 2025 I had used that code to create this package and the functions within it.
+This idea started from me coding the backbone of this package as a single program for Ontario Campus Carball's stats in Fall 2024, and by Winter 2025 I had used that code to create this package and the functions within it.
 
 ### Usage
 This package can be downloaded to the user's rstudio by installing the `devtools` package and running the command `devtools::install_github('brettjacot/BallchasingScrapeR')`  workflow of this package is as follows:
