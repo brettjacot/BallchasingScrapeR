@@ -1,7 +1,0 @@
-exportPattern("^[[:alpha:]]+")
-import(httr)
-import(jsonlite)
-import(dplyr)
-import(tidyr)
-import(lubridate)
-import(stringr)
